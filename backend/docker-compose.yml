@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: sisfact_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sisfact_db
+      POSTGRES_USER: sisfact_user
+      POSTGRES_PASSWORD: sisfact_password123
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./sql/02_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sisfact_user -d sisfact_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # PostgREST - Instant RESTful API directly on top of PostgreSQL
+  # ---------------------------------------------------------------------------
+  postgrest:
+    image: postgrest/postgrest:v12.0.2
+    container_name: sisfact_postgrest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PGRST_DB_URI: postgres://sisfact_user:sisfact_password123@postgres:5432/sisfact_db
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: sisfact_user
+      PGRST_OPENAPI_SERVER_PROXY_URI: http://localhost:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # SisFact Backend Go (Golang) API
+  # ---------------------------------------------------------------------------
+  go-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sisfact_go_api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: sisfact_user
+      DB_PASSWORD: sisfact_password123
+      DB_NAME: sisfact_db
+      DB_SSLMODE: disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
