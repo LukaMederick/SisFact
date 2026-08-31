@@ -12,7 +12,7 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth >= 1000;
+    final isDesktop = screenWidth >= 950;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -20,9 +20,9 @@ class DashboardScreen extends StatelessWidget {
           ? Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Left Column: Profile Card & Shift Card (width: 320)
+                // Left Column: Profile Card & Shift Card (width: 280)
                 SizedBox(
-                  width: 300,
+                  width: 280,
                   child: Column(
                     children: [
                       _buildProfileCard(context, isDark),
@@ -31,9 +31,9 @@ class DashboardScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 24),
+                const SizedBox(width: 20),
 
-                // Right Column: Greeting, Stats, Sales Trend, Widgets
+                // Center Column: Greeting, Stats, Sales Trend, Widgets
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -50,11 +50,11 @@ class DashboardScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 24),
+                const SizedBox(width: 20),
 
-                // Far Right Widgets (Payment info & Restock)
+                // Right Column: Payment info & Restock (width: 260)
                 SizedBox(
-                  width: 280,
+                  width: 260,
                   child: Column(
                     children: [
                       _buildPaymentMethodWidget(context, isDark),

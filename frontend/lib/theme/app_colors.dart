@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
+  // Layout constraints
+  static const double maxContentWidth = 1160.0;
+
   // Primary brand blue (Exact match from screenshots: #2563EB)
   static const Color primary = Color(0xFF2563EB);
   static const Color primaryDark = Color(0xFF1D4ED8);

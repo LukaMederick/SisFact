@@ -36,11 +36,17 @@ class MainShell extends StatelessWidget {
             // Top Navigation Bar
             AppTopBar(state: state),
 
-            // Screen Content
+            // Screen Content (Top-aligned, centered horizontally with max-width)
             Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: _buildCurrentScreen(),
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: AppColors.maxContentWidth),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: _buildCurrentScreen(),
+                  ),
+                ),
               ),
             ),
           ],

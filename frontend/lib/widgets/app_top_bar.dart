@@ -13,11 +13,12 @@ class AppTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isMobile = MediaQuery.of(context).size.width < 850;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 850;
 
     return Container(
       height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      width: double.infinity,
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : AppColors.card,
         border: Border(
@@ -27,94 +28,98 @@ class AppTopBar extends StatelessWidget {
           ),
         ),
       ),
-      child: Row(
-        children: [
-          // Left: Store Profile Selector
-          _buildStoreSelector(context, isDark),
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: AppColors.maxContentWidth),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Row(
+            children: [
+              // Left: Store Profile Selector
+              _buildStoreSelector(context, isDark),
 
-          const SizedBox(width: 12),
+              const SizedBox(width: 12),
 
-          // Search Bar
-          if (!isMobile)
-            Expanded(
-              flex: 2,
-              child: _buildSearchBar(context, isDark),
-            ),
-
-          if (!isMobile) const Spacer(flex: 1),
-
-          // Center Tabs (Desktop / Tablet)
-          if (!isMobile)
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildNavTab(
-                  context,
-                  index: 0,
-                  icon: Icons.home_outlined,
-                  activeIcon: Icons.home_rounded,
-                  label: 'Inicio',
+              // Search Bar (Compact & bounded)
+              if (!isMobile)
+                SizedBox(
+                  width: 220,
+                  child: _buildSearchBar(context, isDark),
                 ),
-                _buildNavTab(
-                  context,
-                  index: 1,
-                  icon: Icons.all_inbox_outlined,
-                  activeIcon: Icons.all_inbox_rounded,
-                  label: 'Inventario',
-                ),
-                _buildNavTab(
-                  context,
-                  index: 2,
-                  icon: Icons.shopping_basket_outlined,
-                  activeIcon: Icons.shopping_basket_rounded,
-                  label: 'Vender',
-                ),
-                _buildNavTab(
-                  context,
-                  index: 3,
-                  icon: Icons.attach_money_rounded,
-                  activeIcon: Icons.attach_money_rounded,
-                  label: 'Ventas',
-                ),
-                _buildMoreTab(context, isDark),
-              ],
-            ),
 
-          if (isMobile) const Spacer(),
+              const Spacer(),
 
-          if (isMobile)
-            IconButton(
-              icon: const Icon(Icons.search_rounded),
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (ctx) => GlobalSearchDialog(state: state),
-                );
-              },
-            ),
-
-          const SizedBox(width: 8),
-
-          // Right: Fullscreen Button
-          IconButton(
-            icon: const Icon(Icons.fullscreen_rounded, size: 22),
-            color: isDark ? AppColors.darkTextSecondary : AppColors.textSecondary,
-            tooltip: 'Pantalla completa',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Modo pantalla completa'),
-                  duration: Duration(seconds: 1),
+              // Navigation Tabs (Desktop / Tablet)
+              if (!isMobile)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildNavTab(
+                      context,
+                      index: 0,
+                      icon: Icons.home_outlined,
+                      activeIcon: Icons.home_rounded,
+                      label: 'Inicio',
+                    ),
+                    _buildNavTab(
+                      context,
+                      index: 1,
+                      icon: Icons.all_inbox_outlined,
+                      activeIcon: Icons.all_inbox_rounded,
+                      label: 'Inventario',
+                    ),
+                    _buildNavTab(
+                      context,
+                      index: 2,
+                      icon: Icons.shopping_basket_outlined,
+                      activeIcon: Icons.shopping_basket_rounded,
+                      label: 'Vender',
+                    ),
+                    _buildNavTab(
+                      context,
+                      index: 3,
+                      icon: Icons.attach_money_rounded,
+                      activeIcon: Icons.attach_money_rounded,
+                      label: 'Ventas',
+                    ),
+                    _buildMoreTab(context, isDark),
+                  ],
                 ),
-              );
-            },
+
+              if (isMobile)
+                IconButton(
+                  icon: const Icon(Icons.search_rounded),
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => GlobalSearchDialog(state: state),
+                    );
+                  },
+                ),
+
+              const SizedBox(width: 6),
+
+              // Right: Fullscreen Button
+              IconButton(
+                icon: const Icon(Icons.fullscreen_rounded, size: 22),
+                color: isDark ? AppColors.darkTextSecondary : AppColors.textSecondary,
+                tooltip: 'Pantalla completa',
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Modo pantalla completa'),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(width: 4),
+
+              // Right: User Profile Avatar
+              _buildUserAvatar(context, isDark),
+            ],
           ),
-
-          const SizedBox(width: 4),
-
-          // Right: User Profile Avatar
-          _buildUserAvatar(context, isDark),
-        ],
+        ),
       ),
     );
   }
@@ -128,7 +133,7 @@ class AppTopBar extends StatelessWidget {
       },
       borderRadius: BorderRadius.circular(8),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         child: Row(
           children: [
             Container(
@@ -210,11 +215,14 @@ class AppTopBar extends StatelessWidget {
               color: isDark ? AppColors.darkTextSecondary : AppColors.textSecondary,
             ),
             const SizedBox(width: 8),
-            Text(
-              'Buscar páginas, funciones...',
-              style: TextStyle(
-                fontSize: 13,
-                color: isDark ? AppColors.darkTextSecondary : AppColors.textMuted,
+            Expanded(
+              child: Text(
+                'Buscar páginas, funciones...',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: isDark ? AppColors.darkTextSecondary : AppColors.textMuted,
+                ),
               ),
             ),
           ],
@@ -236,7 +244,7 @@ class AppTopBar extends StatelessWidget {
       onTap: () => state.setTab(index),
       child: Container(
         height: 64,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
@@ -269,7 +277,7 @@ class AppTopBar extends StatelessWidget {
   }
 
   Widget _buildMoreTab(BuildContext context, bool isDark) {
-    final isSelected = state.currentTabIndex == 4;
+    final isSelected = state.currentTabIndex >= 4;
 
     return InkWell(
       onTap: () {
@@ -280,7 +288,7 @@ class AppTopBar extends StatelessWidget {
       },
       child: Container(
         height: 64,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
