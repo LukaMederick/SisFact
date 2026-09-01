@@ -2,12 +2,13 @@
 
 Este backend provee la API RESTful de alta velocidad para el sistema de ventas y facturación **SisFact**, con compatibilidad nativa para PostgreSQL y PostgREST.
 
-## 🚀 Requisitos
-- Go 1.22 o superior (o Goland IDE)
-- Docker y Docker Compose (opcional para PostgreSQL y PostgREST)
+## 🚀 Requisitos y Versiones
+- **Go**: 1.22 o superior (Probado en `go1.26.x` / `go1.22.x`)
+- **Docker & Docker Compose**: Opcional para PostgreSQL 15 y PostgREST v12
 
 ## 📁 Estructura del Proyecto
-- `cmd/api/main.go`: Punto de entrada del servidor Go.
+- `main.go`: Punto de entrada directo en la raíz del backend.
+- `cmd/api/main.go`: Punto de entrada modular estándar.
 - `internal/handlers/`: Controladores de endpoints REST (`/api/dashboard`, `/api/products`, `/api/shifts`, `/api/sales`, `/api/cash-registers`).
 - `internal/models/`: Estructuras de datos (Branch, Product, Shift, Sale, etc.).
 - `internal/repository/`: Capa de datos con soporte en memoria + PostgreSQL (`pgx`/`sql`).
@@ -18,20 +19,37 @@ Este backend provee la API RESTful de alta velocidad para el sistema de ventas y
 ## 💻 Ejecución Local
 
 ### Opción 1: Ejecutar solo el servidor Go (Modo local / Autónomo)
-```bash
-go run ./cmd/api/main.go
-```
-El servidor iniciará en `http://localhost:8080`.
+
+1. Posiciónate en la carpeta `backend`:
+   ```bash
+   cd backend
+   ```
+
+2. Descarga dependencias:
+   ```bash
+   go mod download
+   ```
+
+3. Inicia el servidor:
+   ```bash
+   go run main.go
+   ```
+   *(o también `go run ./cmd/api/main.go`)*
+
+El servidor iniciará en: `http://localhost:8080`.
+
+---
 
 ### Opción 2: Levantar PostgreSQL + PostgREST + Go API con Docker
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 - **Go API**: `http://localhost:8080/api/health`
 - **PostgREST API**: `http://localhost:3000`
 - **PostgreSQL**: `localhost:5432` (Usuario: `sisfact_user`, Base de datos: `sisfact_db`)
 
 ## 🛠️ Endpoints Principales
+- `GET /api/health`: Estado del servicio.
 - `GET /api/dashboard`: Métricas en vivo del día, total 7 días, promedio y estado de jornada.
 - `GET /api/products`: Lista de productos en inventario.
 - `POST /api/products`: Crear un nuevo producto con código de barras, precio, costo y stock.
