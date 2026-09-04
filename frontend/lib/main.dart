@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'theme/app_theme.dart';
 import 'state/app_state.dart';
 import 'screens/main_shell.dart';
+import 'screens/auth_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('es', null);
+  await initializeDateFormatting('es_ES', null);
 
   // Configure Android edge-to-edge UI without black bars
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -51,7 +55,7 @@ class _SisFactAppState extends State<SisFactApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'SisFact - Facturación y Punto de Venta',
+      title: 'Nubetap - Facturación y Punto de Venta',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
@@ -62,7 +66,9 @@ class _SisFactAppState extends State<SisFactApp> {
                 child: CircularProgressIndicator(),
               ),
             )
-          : MainShell(state: _appState),
+          : (_appState.isAuthenticated
+              ? MainShell(state: _appState)
+              : AuthScreen(state: _appState)),
     );
   }
 }

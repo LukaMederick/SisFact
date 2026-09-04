@@ -47,12 +47,12 @@ class UserMenuPopup extends StatelessWidget {
                       color: AppColors.primary,
                       shape: BoxShape.circle,
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Text(
-                        'U',
-                        style: TextStyle(
+                        state.user.initials,
+                        style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -64,24 +64,25 @@ class UserMenuPopup extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          state.user.email,
+                          state.user.fullName.isNotEmpty ? state.user.fullName : state.user.email,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
                             color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
                           ),
                         ),
-                        const SizedBox(height: 2),
                         Text(
-                          state.user.role,
+                          state.user.email,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.textMuted,
                           ),
                         ),
+                        const SizedBox(height: 2),
                         Text(
-                          state.user.storeName,
+                          '${state.user.role} · ${state.user.storeName}',
                           style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
@@ -104,7 +105,7 @@ class UserMenuPopup extends StatelessWidget {
               onTap: () {
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Perfil de Administrador')),
+                  SnackBar(content: Text('Perfil: ${state.user.fullName}')),
                 );
               },
             ),
@@ -190,11 +191,14 @@ class UserMenuPopup extends StatelessWidget {
               title: 'Cerrar sesión',
               textColor: AppColors.danger,
               iconColor: AppColors.danger,
-              onTap: () {
+              onTap: () async {
                 Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Sesión cerrada con éxito')),
-                );
+                await state.logout();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Sesión cerrada con éxito')),
+                  );
+                }
               },
             ),
             const SizedBox(height: 6),

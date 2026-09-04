@@ -16,6 +16,89 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
   String _searchQuery = '';
   bool _adminActive = true;
 
+  void _showEditEmployeeDialog() {
+    final firstCtrl = TextEditingController(text: widget.state.user.firstName);
+    final lastCtrl = TextEditingController(text: widget.state.user.lastName);
+    final emailCtrl = TextEditingController(text: widget.state.user.email);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Editar Empleado', style: TextStyle(fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Nombres', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            TextField(controller: firstCtrl, decoration: const InputDecoration(hintText: 'Nombres')),
+            const SizedBox(height: 12),
+            const Text('Apellidos', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            TextField(controller: lastCtrl, decoration: const InputDecoration(hintText: 'Apellidos')),
+            const SizedBox(height: 12),
+            const Text('Correo Electrónico', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            TextField(controller: emailCtrl, decoration: const InputDecoration(hintText: 'correo@ejemplo.com')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              widget.state.updateUserProfile(
+                widget.state.user.copyWith(
+                  firstName: firstCtrl.text.trim(),
+                  lastName: lastCtrl.text.trim(),
+                  email: emailCtrl.text.trim(),
+                ),
+              );
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Empleado actualizado con éxito')),
+              );
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteEmployeeDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Self-account protection as requested: "no puedes eliminar tu propia cuenta"
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.info_outline_rounded, color: AppColors.danger, size: 22),
+            SizedBox(width: 8),
+            Text('No permitido', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          ],
+        ),
+        content: const Text(
+          'No puedes eliminar tu propia cuenta de administrador.',
+          style: TextStyle(fontSize: 13.5),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -156,18 +239,27 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                 const SizedBox(height: 8),
 
                 // Row 1: Administrador (Screenshot 1)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    border: Border(bottom: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.borderLight)),
-                  ),
-                  child: Row(
-                    children: [
-                      // Nombre (empty/space)
-                      const Expanded(
-                        flex: 2,
-                        child: Text('-', style: TextStyle(color: AppColors.textMuted)),
-                      ),
+                if (_searchQuery.isEmpty ||
+                    widget.state.user.fullName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                    widget.state.user.email.toLowerCase().contains(_searchQuery.toLowerCase()))
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      border: Border(bottom: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.borderLight)),
+                    ),
+                    child: Row(
+                      children: [
+                        // Nombre
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            widget.state.user.fullName.isNotEmpty ? widget.state.user.fullName : '-',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
 
                       // Email
                       Expanded(
@@ -254,7 +346,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                             child: Switch(
                               value: _adminActive,
                               onChanged: (val) => setState(() => _adminActive = val),
-                              activeColor: AppColors.primary,
+                              activeTrackColor: AppColors.primary,
                             ),
                           ),
                         ),
@@ -269,10 +361,41 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                         ),
                       ),
 
-                      // Action dots
-                      const SizedBox(
+                      // Action dots with PopupMenu
+                      SizedBox(
                         width: 40,
-                        child: Icon(Icons.more_horiz_rounded, size: 18, color: AppColors.textMuted),
+                        child: PopupMenuButton<String>(
+                          onSelected: (choice) {
+                            if (choice == 'edit') {
+                              _showEditEmployeeDialog();
+                            } else if (choice == 'delete') {
+                              _showDeleteEmployeeDialog();
+                            }
+                          },
+                          itemBuilder: (ctx) => [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit_outlined, size: 16, color: AppColors.primary),
+                                  SizedBox(width: 8),
+                                  Text('Editar', style: TextStyle(fontSize: 13)),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete_outline_rounded, size: 16, color: AppColors.danger),
+                                  SizedBox(width: 8),
+                                  Text('Eliminar', style: TextStyle(fontSize: 13, color: AppColors.danger)),
+                                ],
+                              ),
+                            ),
+                          ],
+                          child: const Icon(Icons.more_horiz_rounded, size: 18, color: AppColors.textMuted),
+                        ),
                       ),
                     ],
                   ),

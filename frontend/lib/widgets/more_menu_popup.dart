@@ -7,88 +7,129 @@ class MoreMenuPopup extends StatelessWidget {
 
   const MoreMenuPopup({super.key, required this.state});
 
+  static void showAtButton(BuildContext buttonContext, AppState state) {
+    final renderBox = buttonContext.findRenderObject() as RenderBox?;
+    double left = 0;
+    double top = 64;
+
+    if (renderBox != null) {
+      final offset = renderBox.localToGlobal(Offset.zero);
+      left = offset.dx - 30;
+      top = offset.dy + renderBox.size.height + 4;
+    }
+
+    final screenWidth = MediaQuery.of(buttonContext).size.width;
+    final clampedLeft = left.clamp(16.0, screenWidth - 250.0);
+
+    showGeneralDialog(
+      context: buttonContext,
+      barrierDismissible: true,
+      barrierLabel: 'MoreMenuPopup',
+      barrierColor: Colors.black.withValues(alpha: 0.1),
+      transitionDuration: const Duration(milliseconds: 150),
+      pageBuilder: (ctx, anim1, anim2) {
+        return Stack(
+          children: [
+            Positioned(
+              left: clampedLeft,
+              top: top,
+              child: Material(
+                color: Colors.transparent,
+                child: MoreMenuPopup(state: state),
+              ),
+            ),
+          ],
+        );
+      },
+      transitionBuilder: (ctx, anim1, anim2, child) {
+        return FadeTransition(
+          opacity: anim1,
+          child: child,
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final List<Map<String, dynamic>> menuItems = [
-      {'title': 'Cajas', 'icon': Icons.all_inbox_outlined, 'action': () => state.setTab(4)},
-      {'title': 'Aperturas de caja', 'icon': Icons.history_rounded, 'action': () => state.setTab(5)},
-      {'title': 'Jornadas', 'icon': Icons.calendar_today_outlined, 'action': () => state.setTab(6)},
-      {'title': 'Movimientos', 'icon': Icons.swap_horiz_rounded, 'action': () => state.setTab(8)},
-      {'title': 'Compras', 'icon': Icons.shopping_cart_outlined, 'action': () => state.setTab(7)},
-      {'title': 'Empleados', 'icon': Icons.person_outline_rounded, 'action': () => state.setTab(9)},
-      {'title': 'Clientes', 'icon': Icons.people_outline_rounded, 'action': () => state.setTab(10)},
-      {'title': 'Roles y Permisos', 'icon': Icons.security_outlined, 'action': () => state.setTab(11)},
-      {'title': 'Reportes', 'icon': Icons.bar_chart_rounded, 'action': () => state.setTab(12)},
+      {'title': 'Cajas', 'icon': Icons.inbox_outlined, 'tab': 4},
+      {'title': 'Aperturas de caja', 'icon': Icons.history_rounded, 'tab': 5},
+      {'title': 'Jornadas', 'icon': Icons.calendar_today_outlined, 'tab': 6},
+      {'title': 'Movimientos', 'icon': Icons.sync_alt_rounded, 'tab': 8},
+      {'title': 'Compras', 'icon': Icons.shopping_cart_outlined, 'tab': 7},
+      {'title': 'Empleados', 'icon': Icons.person_outline_rounded, 'tab': 9},
+      {'title': 'Clientes', 'icon': Icons.group_outlined, 'tab': 10},
+      {'title': 'Roles y Permisos', 'icon': Icons.shield_outlined, 'tab': 11},
+      {'title': 'Reportes', 'icon': Icons.bar_chart_rounded, 'tab': 12},
     ];
 
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      alignment: Alignment.topRight,
-      insetPadding: const EdgeInsets.only(top: 60, right: 100),
-      child: Container(
-        width: 250,
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkCard : AppColors.card,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark ? AppColors.darkBorder : AppColors.border,
+    return Container(
+      width: 235,
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.12),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.12),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: menuItems.map((item) {
-            final isCajas = item['title'] == 'Cajas' || item['title'] == 'Movimientos';
-            return InkWell(
-              onTap: () {
-                Navigator.of(context).pop();
-                (item['action'] as VoidCallback)();
-              },
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isCajas && state.currentTabIndex == 4
-                      ? (isDark ? const Color(0xFF1E3A8A).withOpacity(0.3) : const Color(0xFFEFF6FF))
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      item['icon'] as IconData,
-                      size: 19,
-                      color: isCajas && state.currentTabIndex == 4
-                          ? AppColors.primary
-                          : (isDark ? AppColors.darkTextSecondary : AppColors.textSecondary),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      item['title'] as String,
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w500,
-                        color: isCajas && state.currentTabIndex == 4
-                            ? AppColors.primary
-                            : (isDark ? AppColors.darkTextPrimary : AppColors.textPrimary),
-                      ),
-                    ),
-                  ],
-                ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: menuItems.map((item) {
+          final tab = item['tab'] as int;
+          final isCurrentTab = state.currentTabIndex == tab;
+
+          return InkWell(
+            onTap: () {
+              Navigator.of(context).pop();
+              state.setTab(tab);
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                color: isCurrentTab
+                    ? (isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.3) : const Color(0xFFEFF6FF))
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
               ),
-            );
-          }).toList(),
-        ),
+              child: Row(
+                children: [
+                  Icon(
+                    item['icon'] as IconData,
+                    size: 19,
+                    color: isCurrentTab
+                        ? AppColors.primary
+                        : (isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    item['title'] as String,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: isCurrentTab ? FontWeight.w600 : FontWeight.w500,
+                      color: isCurrentTab
+                          ? AppColors.primary
+                          : (isDark ? AppColors.darkTextPrimary : const Color(0xFF0F172A)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }

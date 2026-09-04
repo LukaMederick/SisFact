@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../state/app_state.dart';
 import '../widgets/date_range_picker_dialog.dart';
+import '../widgets/open_shift_drawer.dart';
+import '../widgets/close_shift_dialog.dart';
+import '../widgets/cash_movement_dialog.dart';
 
 class DashboardScreen extends StatelessWidget {
   final AppState state;
@@ -125,7 +128,7 @@ class DashboardScreen extends StatelessWidget {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
+                        color: Colors.black.withValues(alpha: 0.08),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -215,9 +218,21 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  // Left: Shift Card (Jornada del día)
+  // Left: Shift Card (Jornada del día) - Matches Images 2 & 3
   Widget _buildShiftCard(BuildContext context, bool isDark) {
     final isOpen = state.currentShift?.isOpen ?? false;
+
+    // Calculate elapsed time if open
+    String elapsedTime = '0m';
+    if (isOpen && state.currentShift != null) {
+      final diff = DateTime.now().difference(state.currentShift!.openedAt);
+      final minutes = diff.inMinutes;
+      if (minutes < 60) {
+        elapsedTime = '${minutes}m';
+      } else {
+        elapsedTime = '${diff.inHours}h ${minutes % 60}m';
+      }
+    }
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -227,20 +242,25 @@ class DashboardScreen extends StatelessWidget {
         border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  Icon(Icons.calendar_today_outlined, size: 16, color: isDark ? AppColors.darkTextSecondary : AppColors.textSecondary),
+                  Icon(
+                    Icons.calendar_today_outlined,
+                    size: 15,
+                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'Jornada del día',
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? AppColors.darkTextPrimary : const Color(0xFF0F172A),
                     ),
                   ),
                 ],
@@ -249,60 +269,113 @@ class DashboardScreen extends StatelessWidget {
                 width: 8,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: isOpen ? AppColors.success : Colors.grey.shade400,
+                  color: isOpen ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
                   shape: BoxShape.circle,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              isOpen ? Icons.wb_sunny_outlined : Icons.nightlight_round_outlined,
-              size: 26,
-              color: isOpen ? AppColors.warning : AppColors.textMuted,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            isOpen ? 'Jornada en curso' : 'Sin jornada abierta',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            isOpen
-                ? 'Operaciones activas de venta'
-                : 'Ábrela para empezar a registrar ventas del día.',
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
-          ),
           const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                state.setTab(2); // Go to Vender / POS
-              },
-              icon: Icon(isOpen ? Icons.point_of_sale_rounded : Icons.play_arrow_rounded, size: 18),
-              label: Text(isOpen ? 'Ir al POS' : 'Abrir jornada'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(vertical: 12),
+
+          if (!isOpen) ...[
+            // SHIFT CLOSED VIEW (Image 2)
+            Center(
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.nightlight_round_outlined,
+                  size: 24,
+                  color: AppColors.textMuted,
+                ),
               ),
             ),
-          ),
+            const SizedBox(height: 12),
+            Center(
+              child: Text(
+                'Sin jornada abierta',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? AppColors.darkTextPrimary : const Color(0xFF0F172A),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Center(
+              child: Text(
+                'Ábrela para empezar a registrar ventas del día.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                OpenShiftDrawer.show(context, state);
+              },
+              icon: const Icon(Icons.play_arrow_rounded, size: 18),
+              label: const Text('Abrir jornada', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ] else ...[
+            // SHIFT OPEN VIEW (Image 3)
+            _buildShiftInfoRow('Sucursal', state.store.branchName, isDark, isBold: true),
+            const SizedBox(height: 8),
+            _buildShiftInfoRow('Abierta por', '—', isDark),
+            const SizedBox(height: 8),
+            _buildShiftInfoRow('Tiempo', elapsedTime, isDark, isBold: true),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => CloseShiftDialog(state: state),
+                );
+              },
+              icon: const Icon(Icons.calendar_today_outlined, size: 15, color: Color(0xFFEF4444)),
+              label: const Text(
+                'Cerrar jornada',
+                style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFFFCA5A5)),
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _buildShiftInfoRow(String label, String value, bool isDark, {bool isBold = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
+            color: isDark ? AppColors.darkTextPrimary : const Color(0xFF0F172A),
+          ),
+        ),
+      ],
     );
   }
 
@@ -416,7 +489,7 @@ class DashboardScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
-                  Icons.receipt_long_outlined,
+                  Icons.payments_outlined,
                   size: 22,
                   color: isDark ? AppColors.darkTextSecondary : AppColors.textSecondary,
                 ),
@@ -428,8 +501,10 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  // Quick Actions Card
+  // Quick Actions Card (Matching Images 2 & 3)
   Widget _buildQuickActions(BuildContext context, bool isDark) {
+    final isOpen = state.currentShift?.isOpen ?? false;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -442,59 +517,194 @@ class DashboardScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        InkWell(
-          onTap: () => state.setTab(2),
-          borderRadius: BorderRadius.circular(14),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkCard : AppColors.card,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: AppColors.successLight,
-                    borderRadius: BorderRadius.circular(10),
+
+        if (!isOpen)
+          // CLOSED STATE: Single Large "Abrir jornada" Card (Image 2)
+          InkWell(
+            onTap: () {
+              OpenShiftDrawer.show(context, state);
+            },
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkCard : AppColors.card,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.play_arrow_outlined, color: Color(0xFF10B981), size: 22),
                   ),
-                  child: const Icon(Icons.play_arrow_rounded, color: AppColors.success, size: 22),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        state.currentShift?.isOpen ?? false ? 'Continuar vendiendo' : 'Abrir jornada',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Abrir jornada',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                          ),
                         ),
-                      ),
-                      Text(
-                        state.currentShift?.isOpen ?? false
-                            ? 'Registrar ventas en terminal POS'
-                            : 'Inicia las operaciones del día',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                      ),
-                    ],
+                        const Text(
+                          'Inicia las operaciones del día',
+                          style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: 20,
-                  color: isDark ? AppColors.darkTextSecondary : AppColors.textSecondary,
-                ),
-              ],
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: isDark ? AppColors.darkTextSecondary : AppColors.textSecondary,
+                  ),
+                ],
+              ),
             ),
+          )
+        else
+          // OPEN STATE: 2x2 Grid with Ingreso, Egreso, Nueva venta, Cerrar jornada (Image 3)
+          Column(
+            children: [
+              Row(
+                children: [
+                  // Ingreso
+                  Expanded(
+                    child: _buildActionTile(
+                      context,
+                      isDark: isDark,
+                      icon: Icons.add_circle_outline_rounded,
+                      iconBgColor: const Color(0xFFECFDF5),
+                      iconColor: const Color(0xFF10B981),
+                      title: 'Ingreso',
+                      onTap: () {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => CashMovementDialog(state: state, initialType: 'Ingreso'),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Egreso
+                  Expanded(
+                    child: _buildActionTile(
+                      context,
+                      isDark: isDark,
+                      icon: Icons.remove_circle_outline_rounded,
+                      iconBgColor: const Color(0xFFFEF2F2),
+                      iconColor: const Color(0xFFEF4444),
+                      title: 'Egreso',
+                      onTap: () {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => CashMovementDialog(state: state, initialType: 'Egreso'),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  // Nueva venta
+                  Expanded(
+                    child: _buildActionTile(
+                      context,
+                      isDark: isDark,
+                      icon: Icons.shopping_cart_outlined,
+                      iconBgColor: const Color(0xFFEFF6FF),
+                      iconColor: AppColors.primary,
+                      title: 'Nueva venta',
+                      onTap: () => state.setTab(2),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Cerrar jornada
+                  Expanded(
+                    child: _buildActionTile(
+                      context,
+                      isDark: isDark,
+                      icon: Icons.calendar_today_outlined,
+                      iconBgColor: const Color(0xFFFEF2F2),
+                      iconColor: const Color(0xFFEF4444),
+                      title: 'Cerrar jornada',
+                      onTap: () {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => CloseShiftDialog(state: state),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ),
       ],
+    );
+  }
+
+  Widget _buildActionTile(
+    BuildContext context, {
+    required bool isDark,
+    required IconData icon,
+    required Color iconBgColor,
+    required Color iconColor,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkCard : AppColors.card,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: isDark ? iconColor.withValues(alpha: 0.15) : iconBgColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: iconColor, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 18,
+              color: isDark ? AppColors.darkTextSecondary : AppColors.textSecondary,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -805,7 +1015,7 @@ class DashboardScreen extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           const Text(
-            'Todo el stock está por encima del mínimo. 🫅',
+            'Todo el stock está por encima del mínimo. 👏',
             style: TextStyle(fontSize: 12, color: AppColors.textMuted),
           ),
         ],

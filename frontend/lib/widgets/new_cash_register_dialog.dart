@@ -22,7 +22,7 @@ class _NewCashRegisterDialogState extends State<NewCashRegisterDialog> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -40,8 +40,8 @@ class _NewCashRegisterDialogState extends State<NewCashRegisterDialog> {
       createdAt: DateTime.now(),
     );
 
-    widget.state.cashRegisters.add(newRegister);
-    widget.state.notifyListeners();
+    await widget.state.addCashRegister(newRegister);
+    if (!mounted) return;
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Caja "$name" creada con éxito')),
@@ -75,7 +75,7 @@ class _NewCashRegisterDialogState extends State<NewCashRegisterDialog> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.15),
+              color: Colors.black.withValues(alpha: 0.15),
               blurRadius: 30,
               offset: const Offset(-5, 0),
             ),
@@ -132,10 +132,10 @@ class _NewCashRegisterDialogState extends State<NewCashRegisterDialog> {
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E3A8A).withOpacity(0.2) : const Color(0xFFEFF6FF),
+                      color: isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.2) : const Color(0xFFEFF6FF),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: AppColors.primary.withOpacity(0.3),
+                        color: AppColors.primary.withValues(alpha: 0.3),
                       ),
                     ),
                     child: Row(
@@ -279,7 +279,7 @@ class _NewCashRegisterDialogState extends State<NewCashRegisterDialog> {
                         Switch(
                           value: _isActive,
                           onChanged: (val) => setState(() => _isActive = val),
-                          activeColor: AppColors.primary,
+                          activeThumbColor: AppColors.primary,
                         ),
                       ],
                     ),

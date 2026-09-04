@@ -4,6 +4,7 @@ import '../models/models.dart';
 import '../state/app_state.dart';
 import '../widgets/kpi_card.dart';
 import '../widgets/new_cash_register_dialog.dart';
+import '../widgets/open_box_session_dialog.dart';
 
 class CashRegistersScreen extends StatefulWidget {
   final AppState state;
@@ -21,6 +22,80 @@ class _CashRegistersScreenState extends State<CashRegistersScreen> {
     showDialog(
       context: context,
       builder: (ctx) => NewCashRegisterDialog(state: widget.state),
+    );
+  }
+
+  void _showEditDialog(CashRegisterItem item) {
+    final nameCtrl = TextEditingController(text: item.name);
+    final branchCtrl = TextEditingController(text: item.branchName);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Editar Caja', style: TextStyle(fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Nombre de la caja', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            TextField(controller: nameCtrl, decoration: const InputDecoration(hintText: 'Ej: Caja 1')),
+            const SizedBox(height: 12),
+            const Text('Sucursal', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            TextField(controller: branchCtrl, decoration: const InputDecoration(hintText: 'Ej: Prueba - Principal')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                item.name = nameCtrl.text.trim();
+                item.branchName = branchCtrl.text.trim();
+              });
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Caja actualizada con éxito')),
+              );
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteDialog(CashRegisterItem item) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Eliminar Caja', style: TextStyle(fontWeight: FontWeight.w700)),
+        content: Text('¿Estás seguro de que deseas eliminar la caja "${item.name}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                widget.state.cashRegisters.removeWhere((cr) => cr.id == item.id);
+              });
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Caja "${item.name}" eliminada')),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -282,7 +357,7 @@ class _CashRegistersScreenState extends State<CashRegistersScreen> {
                       child: Switch(
                         value: item.isActive,
                         onChanged: (val) => setState(() => item.isActive = val),
-                        activeColor: AppColors.primary,
+                        activeTrackColor: AppColors.primary,
                       ),
                     ),
                   ),
@@ -335,16 +410,63 @@ class _CashRegistersScreenState extends State<CashRegistersScreen> {
                         ),
                         child: IconButton(
                           padding: EdgeInsets.zero,
+                          tooltip: isOpen ? 'Ir al POS' : 'Abrir Caja',
                           icon: Icon(
                             isOpen ? Icons.point_of_sale_rounded : Icons.play_arrow_outlined,
                             size: 16,
                             color: AppColors.success,
                           ),
-                          onPressed: () => widget.state.setTab(2),
+                          onPressed: () {
+                            if (isOpen) {
+                              widget.state.setTab(2);
+                            } else {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => OpenBoxSessionDialog(
+                                  state: widget.state,
+                                  initialRegisterId: item.id,
+                                ),
+                              );
+                            }
+                          },
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.more_horiz_rounded, size: 18, color: AppColors.textMuted),
+                      const SizedBox(width: 6),
+                      PopupMenuButton<String>(
+                        onSelected: (choice) {
+                          if (choice == 'edit') {
+                            _showEditDialog(item);
+                          } else if (choice == 'delete') {
+                            _showDeleteDialog(item);
+                          }
+                        },
+                        itemBuilder: (ctx) => [
+                          const PopupMenuItem(
+                            value: 'edit',
+                            child: Row(
+                              children: [
+                                Icon(Icons.edit_outlined, size: 16, color: AppColors.primary),
+                                SizedBox(width: 8),
+                                Text('Editar', style: TextStyle(fontSize: 13)),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete_outline_rounded, size: 16, color: AppColors.danger),
+                                SizedBox(width: 8),
+                                Text('Eliminar', style: TextStyle(fontSize: 13, color: AppColors.danger)),
+                              ],
+                            ),
+                          ),
+                        ],
+                        child: const Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Icon(Icons.more_horiz_rounded, size: 18, color: AppColors.textMuted),
+                        ),
+                      ),
                     ],
                   ),
                 ),

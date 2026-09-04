@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../state/app_state.dart';
 import '../widgets/new_role_dialog.dart';
+import '../widgets/role_permissions_drawer.dart';
 
 class RolesPermissionsScreen extends StatelessWidget {
   final AppState state;
@@ -158,7 +159,7 @@ class RolesPermissionsScreen extends StatelessWidget {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: isDark ? (role['iconColor'] as Color).withOpacity(0.2) : role['iconBg'] as Color,
+                  color: isDark ? (role['iconColor'] as Color).withValues(alpha: 0.2) : role['iconBg'] as Color,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
@@ -243,9 +244,7 @@ class RolesPermissionsScreen extends StatelessWidget {
                   const SizedBox(width: 12),
                   InkWell(
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Permisos de ${role['title']}')),
-                      );
+                      RolePermissionsDrawer.show(context, role);
                     },
                     child: Row(
                       children: [

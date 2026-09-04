@@ -197,3 +197,83 @@ func (h *Handler) HandleCategories(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonResponse(w, http.StatusOK, categories)
 }
+
+// Auth Handlers
+func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		errorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorResponse(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+	user := map[string]interface{}{
+		"id":         "b0000000-0000-0000-0000-000000000001",
+		"email":      req.Email,
+		"first_name": "Administrador",
+		"last_name":  "Sistema",
+		"role":       "Administrador",
+		"store_name": "Prueba",
+		"token":      "demo-jwt-token-sisfact-2026",
+	}
+	jsonResponse(w, http.StatusOK, user)
+}
+
+func (h *Handler) HandleRegister(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		errorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	var req struct {
+		FirstName string `json:"first_name"`
+		LastName  string `json:"last_name"`
+		Email     string `json:"email"`
+		Password  string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorResponse(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+	user := map[string]interface{}{
+		"id":         "b0000000-0000-0000-0000-000000000002",
+		"email":      req.Email,
+		"first_name": req.FirstName,
+		"last_name":  req.LastName,
+		"role":       "Administrador",
+		"store_name": "Prueba",
+		"token":      "demo-jwt-token-sisfact-2026",
+	}
+	jsonResponse(w, http.StatusCreated, user)
+}
+
+func (h *Handler) HandleGoogleAuth(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		errorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	var req struct {
+		GoogleEmail string `json:"email"`
+		DisplayName string `json:"name"`
+		GoogleToken string `json:"token"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+	email := req.GoogleEmail
+	if email == "" {
+		email = "correo.para.pruebas.2005@gmail.com"
+	}
+	user := map[string]interface{}{
+		"id":         "b0000000-0000-0000-0000-000000000001",
+		"email":      email,
+		"first_name": "Carlos",
+		"last_name":  "Rodriguez",
+		"role":       "Administrador",
+		"store_name": "Prueba",
+		"token":      "demo-google-jwt-token-2026",
+	}
+	jsonResponse(w, http.StatusOK, user)
+}

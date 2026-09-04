@@ -13,7 +13,10 @@ class AppState extends ChangeNotifier {
 
   // Store & User Info
   final StoreInfo store = const StoreInfo();
-  final UserProfile user = const UserProfile();
+  UserProfile? _currentUser;
+  bool isAuthenticated = false;
+
+  UserProfile get user => _currentUser ?? const UserProfile();
 
   // Dark Mode
   bool isDarkMode = false;
@@ -43,12 +46,90 @@ class AppState extends ChangeNotifier {
 
   Future<void> _initData() async {
     isDarkMode = await StorageService.loadDarkMode();
+    _currentUser = await StorageService.loadAuthUser();
+    isAuthenticated = _currentUser != null;
     products = await StorageService.loadProducts();
     categories = await StorageService.loadCategories();
     currentShift = await StorageService.loadCurrentShift();
     sales = await StorageService.loadSales();
     cashRegisters = await StorageService.loadCashRegisters();
     isLoading = false;
+    notifyListeners();
+  }
+
+  // Authentication Handlers
+  Future<bool> loginWithEmail(String email, String password) async {
+    final loadedUser = UserProfile(
+      id: const Uuid().v4(),
+      email: email.trim(),
+      firstName: email.split('@').first,
+      lastName: '',
+      role: 'Administrador',
+      storeName: 'Prueba',
+    );
+    _currentUser = loadedUser;
+    isAuthenticated = true;
+    await StorageService.saveAuthUser(loadedUser);
+    ApiService.login(email, password);
+    notifyListeners();
+    return true;
+  }
+
+  Future<bool> loginWithGoogle({String? googleEmail, String? displayName}) async {
+    final email = googleEmail ?? 'correo.para.pruebas.2005@gmail.com';
+    final nameParts = (displayName ?? 'Carlos Rodriguez').split(' ');
+    final firstName = nameParts.isNotEmpty ? nameParts.first : 'Carlos';
+    final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : 'R.';
+
+    final loadedUser = UserProfile(
+      id: const Uuid().v4(),
+      email: email,
+      firstName: firstName,
+      lastName: lastName,
+      role: 'Administrador',
+      storeName: 'Prueba',
+    );
+    _currentUser = loadedUser;
+    isAuthenticated = true;
+    await StorageService.saveAuthUser(loadedUser);
+    ApiService.googleAuth(email, displayName ?? 'Carlos Rodriguez');
+    notifyListeners();
+    return true;
+  }
+
+  Future<bool> register({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String password,
+  }) async {
+    final newUser = UserProfile(
+      id: const Uuid().v4(),
+      email: email.trim(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      role: 'Administrador',
+      storeName: 'Prueba',
+    );
+    _currentUser = newUser;
+    isAuthenticated = true;
+    await StorageService.saveAuthUser(newUser);
+    ApiService.register(firstName, lastName, email, password);
+    notifyListeners();
+    return true;
+  }
+
+  Future<void> updateUserProfile(UserProfile profile) async {
+    _currentUser = profile;
+    await StorageService.saveAuthUser(profile);
+    notifyListeners();
+  }
+
+  Future<void> logout() async {
+    _currentUser = null;
+    isAuthenticated = false;
+    currentTabIndex = 0;
+    await StorageService.clearAuthUser();
     notifyListeners();
   }
 
@@ -127,6 +208,13 @@ class AppState extends ChangeNotifier {
       ApiService.closeShift(finalAmount, notes);
       notifyListeners();
     }
+  }
+
+  // Cash Register Management
+  Future<void> addCashRegister(CashRegisterItem register) async {
+    cashRegisters.add(register);
+    await StorageService.saveCashRegisters(cashRegisters);
+    notifyListeners();
   }
 
   // Product Management

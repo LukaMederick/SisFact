@@ -80,4 +80,52 @@ class ApiService {
     } catch (_) {}
     return null;
   }
+
+  // Auth Methods
+  static Future<UserProfile?> login(String email, String password) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/auth/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email, 'password': password}),
+      ).timeout(const Duration(seconds: 3));
+      if (res.statusCode == 200) {
+        return UserProfile.fromJson(jsonDecode(res.body));
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<UserProfile?> register(String firstName, String lastName, String email, String password) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/auth/register'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'first_name': firstName,
+          'last_name': lastName,
+          'email': email,
+          'password': password,
+        }),
+      ).timeout(const Duration(seconds: 3));
+      if (res.statusCode == 201 || res.statusCode == 200) {
+        return UserProfile.fromJson(jsonDecode(res.body));
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<UserProfile?> googleAuth(String email, String name) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/auth/google'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email, 'name': name}),
+      ).timeout(const Duration(seconds: 3));
+      if (res.statusCode == 200) {
+        return UserProfile.fromJson(jsonDecode(res.body));
+      }
+    } catch (_) {}
+    return null;
+  }
 }

@@ -9,6 +9,29 @@ class StorageService {
   static const String _keySales = 'sisfact_sales';
   static const String _keyCashRegisters = 'sisfact_cash_registers';
   static const String _keyDarkMode = 'sisfact_dark_mode';
+  static const String _keyUser = 'sisfact_auth_user';
+
+  // Load Auth User
+  static Future<UserProfile?> loadAuthUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getString(_keyUser);
+    if (data == null || data.isEmpty) return null;
+    try {
+      return UserProfile.fromJson(jsonDecode(data) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> saveAuthUser(UserProfile user) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyUser, jsonEncode(user.toJson()));
+  }
+
+  static Future<void> clearAuthUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyUser);
+  }
 
   // Load Products
   static Future<List<Product>> loadProducts() async {
@@ -34,12 +57,7 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     final data = prefs.getString(_keyCategories);
     if (data == null || data.isEmpty) {
-      return [
-        Category(id: '1', name: 'Bebidas', colorHex: '#2563EB'),
-        Category(id: '2', name: 'Snacks & Golosinas', colorHex: '#10B981'),
-        Category(id: '3', name: 'Lácteos & Embutidos', colorHex: '#F59E0B'),
-        Category(id: '4', name: 'Abarrotes', colorHex: '#8B5CF6'),
-      ];
+      return [];
     }
     try {
       final List<dynamic> list = jsonDecode(data);

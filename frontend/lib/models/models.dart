@@ -21,15 +21,77 @@ class StoreInfo {
 class UserProfile {
   final String id;
   final String email;
+  final String firstName;
+  final String lastName;
   final String role;
   final String storeName;
+  final String avatarUrl;
 
   const UserProfile({
     this.id = 'b0000000-0000-0000-0000-000000000001',
     this.email = 'correo.para.pruebas.2005@gmail.com',
+    this.firstName = 'Administrador',
+    this.lastName = 'Sistema',
     this.role = 'Administrador',
     this.storeName = 'Prueba',
+    this.avatarUrl = '',
   });
+
+  String get fullName {
+    if (firstName.isEmpty && lastName.isEmpty) return email.split('@').first;
+    return '$firstName $lastName'.trim();
+  }
+
+  String get initials {
+    if (firstName.isNotEmpty && lastName.isNotEmpty) {
+      return '${firstName[0]}${lastName[0]}'.toUpperCase();
+    } else if (firstName.isNotEmpty) {
+      return firstName.substring(0, firstName.length >= 2 ? 2 : 1).toUpperCase();
+    } else if (email.isNotEmpty) {
+      return email.substring(0, 1).toUpperCase();
+    }
+    return 'U';
+  }
+
+  UserProfile copyWith({
+    String? id,
+    String? email,
+    String? firstName,
+    String? lastName,
+    String? role,
+    String? storeName,
+    String? avatarUrl,
+  }) {
+    return UserProfile(
+      id: id ?? this.id,
+      email: email ?? this.email,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      role: role ?? this.role,
+      storeName: storeName ?? this.storeName,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'email': email,
+    'firstName': firstName,
+    'lastName': lastName,
+    'role': role,
+    'storeName': storeName,
+    'avatarUrl': avatarUrl,
+  };
+
+  factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
+    id: json['id'] as String? ?? 'b0000000-0000-0000-0000-000000000001',
+    email: json['email'] as String? ?? '',
+    firstName: json['firstName'] as String? ?? '',
+    lastName: json['lastName'] as String? ?? '',
+    role: json['role'] as String? ?? 'Administrador',
+    storeName: json['storeName'] as String? ?? 'Prueba',
+    avatarUrl: json['avatarUrl'] as String? ?? '',
+  );
 }
 
 class Category {
@@ -363,8 +425,8 @@ class Sale {
 
 class CashRegisterItem {
   final String id;
-  final String name;
-  final String branchName;
+  String name;
+  String branchName;
   bool isActive;
   String sessionStatus; // 'Abierta', 'Cerrada'
   final DateTime createdAt;

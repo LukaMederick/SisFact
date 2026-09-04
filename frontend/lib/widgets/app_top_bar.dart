@@ -3,7 +3,8 @@ import '../theme/app_colors.dart';
 import '../state/app_state.dart';
 import 'user_menu_popup.dart';
 import 'more_menu_popup.dart';
-import 'global_search_dialog.dart';
+import 'store_selector_popup.dart';
+import 'search_mega_menu_popup.dart';
 
 class AppTopBar extends StatelessWidget {
   final AppState state;
@@ -34,15 +35,15 @@ class AppTopBar extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Row(
             children: [
-              // Left: Store Profile Selector
+              // Left: Store Profile Selector (Image 1)
               _buildStoreSelector(context, isDark),
 
               const SizedBox(width: 12),
 
-              // Search Bar (Compact & bounded)
+              // Search Bar (Image 4 - Mega Menu Dropdown)
               if (!isMobile)
                 SizedBox(
-                  width: 220,
+                  width: 230,
                   child: _buildSearchBar(context, isDark),
                 ),
 
@@ -91,7 +92,7 @@ class AppTopBar extends StatelessWidget {
                   onPressed: () {
                     showDialog(
                       context: context,
-                      builder: (ctx) => GlobalSearchDialog(state: state),
+                      builder: (ctx) => SearchMegaMenuPopup(state: state),
                     );
                   },
                 ),
@@ -127,8 +128,9 @@ class AppTopBar extends StatelessWidget {
   Widget _buildStoreSelector(BuildContext context, bool isDark) {
     return InkWell(
       onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Sucursal: ${state.store.branchName}')),
+        showDialog(
+          context: context,
+          builder: (ctx) => StoreSelectorPopup(state: state),
         );
       },
       borderRadius: BorderRadius.circular(8),
@@ -193,7 +195,7 @@ class AppTopBar extends StatelessWidget {
       onTap: () {
         showDialog(
           context: context,
-          builder: (ctx) => GlobalSearchDialog(state: state),
+          builder: (ctx) => SearchMegaMenuPopup(state: state),
         );
       },
       borderRadius: BorderRadius.circular(10),
@@ -279,59 +281,60 @@ class AppTopBar extends StatelessWidget {
   Widget _buildMoreTab(BuildContext context, bool isDark) {
     final isSelected = state.currentTabIndex >= 4;
 
-    return InkWell(
-      onTap: () {
-        showDialog(
-          context: context,
-          builder: (ctx) => MoreMenuPopup(state: state),
-        );
-      },
-      child: Container(
-        height: 64,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: isSelected ? AppColors.primary : Colors.transparent,
-              width: 2.5,
+    return Builder(
+      builder: (btnCtx) {
+        return InkWell(
+          onTap: () {
+            MoreMenuPopup.showAtButton(btnCtx, state);
+          },
+          child: Container(
+            height: 64,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: isSelected ? AppColors.primary : Colors.transparent,
+                  width: 2.5,
+                ),
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.grid_view_rounded,
+                      size: 19,
+                      color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Más',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                        color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                      ),
+                    ),
+                    Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 14,
+                      color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.grid_view_rounded,
-                  size: 19,
-                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                ),
-              ],
-            ),
-            const SizedBox(height: 3),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Más',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                    color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                  ),
-                ),
-                Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 14,
-                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -355,13 +358,13 @@ class AppTopBar extends StatelessWidget {
                 color: AppColors.primary,
                 shape: BoxShape.circle,
               ),
-              child: const Center(
+              child: Center(
                 child: Text(
-                  'U',
-                  style: TextStyle(
+                  state.user.initials,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
-                    fontSize: 14,
+                    fontSize: 13,
                   ),
                 ),
               ),

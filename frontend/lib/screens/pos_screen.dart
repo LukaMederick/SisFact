@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../models/models.dart';
 import '../state/app_state.dart';
+import '../widgets/open_shift_drawer.dart';
+import '../widgets/free_product_drawer.dart';
 
 class PosScreen extends StatefulWidget {
   final AppState state;
@@ -13,13 +15,14 @@ class PosScreen extends StatefulWidget {
 }
 
 class _PosScreenState extends State<PosScreen> {
-  // Shift opening controllers
-  final _initialAmountController = TextEditingController(text: '0.00');
-  final _openingNotesController = TextEditingController();
-
-  // POS Search & Category Filter
+  // Search & Category Filter
+  final TextEditingController _searchController = TextEditingController();
   String _posSearchQuery = '';
   String _selectedCategory = 'Todos';
+
+  // Pagination
+  int _currentPage = 1;
+  static const int _itemsPerPage = 12;
 
   // Checkout modal state
   String _selectedPaymentMethod = 'Efectivo';
@@ -29,103 +32,98 @@ class _PosScreenState extends State<PosScreen> {
 
   @override
   void dispose() {
-    _initialAmountController.dispose();
-    _openingNotesController.dispose();
+    _searchController.dispose();
     _amountPaidController.dispose();
     _customerNameController.dispose();
     super.dispose();
   }
 
-  void _openShift() {
-    final amount = double.tryParse(_initialAmountController.text.trim()) ?? 0.0;
-    final notes = _openingNotesController.text.trim().isNotEmpty
-        ? _openingNotesController.text.trim()
-        : 'Apertura normal';
-
-    widget.state.openShift(amount, notes);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Jornada abierta correctamente')),
-    );
+  // Quick "Producto Libre" side drawer (Image 1)
+  void _showCustomProductDrawer() {
+    FreeProductDrawer.show(context, widget.state);
   }
 
-  void _showCloseShiftDialog() {
-    final finalAmountCtrl = TextEditingController(text: widget.state.todayCashRevenue.toStringAsFixed(2));
-    final closingNotesCtrl = TextEditingController(text: 'Cierre normal');
-
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        return AlertDialog(
-          backgroundColor: isDark ? AppColors.darkCard : AppColors.card,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Cerrar Jornada', style: TextStyle(fontWeight: FontWeight.w700)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Ingresa el monto final en caja para el arqueo:', style: TextStyle(fontSize: 13)),
-              const SizedBox(height: 12),
-              TextField(
-                controller: finalAmountCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Monto final en caja (S/)'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: closingNotesCtrl,
-                decoration: const InputDecoration(labelText: 'Notas de cierre'),
-              ),
-            ],
-          ),
-          actions: [
-            OutlinedButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final amt = double.tryParse(finalAmountCtrl.text.trim()) ?? 0.0;
-                widget.state.closeShift(amt, closingNotesCtrl.text.trim());
-                Navigator.of(ctx).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Jornada cerrada correctamente')),
-                );
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
-              child: const Text('Cerrar Jornada'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showCheckoutDialog() {
+  // Payment checkout flow
+  void _handleProcessSale() {
     if (widget.state.cart.isEmpty) return;
 
-    _amountPaidController.text = widget.state.cartTotal.toStringAsFixed(2);
+    // If shift is not open, offer to open shift
+    if (widget.state.currentShift == null || !widget.state.currentShift!.isOpen) {
+      _showOpenShiftPrompt();
+      return;
+    }
+
+    _showCheckoutModal();
+  }
+
+  void _showOpenShiftPrompt() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showDialog(
       context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Jornada Cerrada', style: TextStyle(fontWeight: FontWeight.w700)),
+        content: const Text(
+          'Para registrar y cuadrar las ventas en caja necesitas abrir una jornada de operaciones.',
+          style: TextStyle(fontSize: 13.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              OpenShiftDrawer.show(context, widget.state, onShiftOpened: () {
+                _showCheckoutModal();
+              });
+            },
+            child: const Text('Abrir Jornada Ahora'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCheckoutModal() {
+    _amountPaidController.text = widget.state.cartTotal.toStringAsFixed(2);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final isDark = Theme.of(context).brightness == Brightness.dark;
-            final amountPaid = double.tryParse(_amountPaidController.text) ?? widget.state.cartTotal;
-            final change = (amountPaid - widget.state.cartTotal) > 0 ? (amountPaid - widget.state.cartTotal) : 0.0;
+            final total = widget.state.cartTotal;
+            final amountPaid = double.tryParse(_amountPaidController.text) ?? total;
+            final change = (amountPaid - total) > 0 ? (amountPaid - total) : 0.0;
 
-            return Dialog(
-              backgroundColor: Colors.transparent,
-              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
-              child: Container(
-                width: 480,
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkCard : AppColors.card,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
-                ),
-                padding: const EdgeInsets.all(24),
+            final paymentMethods = [
+              {'name': 'Efectivo', 'icon': Icons.payments_outlined},
+              {'name': 'Yape', 'icon': Icons.phone_android_rounded},
+              {'name': 'Plin', 'icon': Icons.qr_code_rounded},
+              {'name': 'Tarjeta', 'icon': Icons.credit_card_rounded},
+              {'name': 'Transferencia', 'icon': Icons.account_balance_outlined},
+            ];
+
+            return Container(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+                top: 20,
+                left: 24,
+                right: 24,
+              ),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkCard : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -133,36 +131,31 @@ class _PosScreenState extends State<PosScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Completar Venta',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
-                          ),
+                        const Text(
+                          'Cobrar Venta',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close_rounded, size: 20),
-                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.pop(ctx),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
 
-                    // Total display
+                    // Total Banner
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E3A8A).withOpacity(0.3) : const Color(0xFFEFF6FF),
+                        color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('TOTAL A COBRAR', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                          const Text('Total a pagar:', style: TextStyle(fontWeight: FontWeight.w600)),
                           Text(
-                            'S/ ${widget.state.cartTotal.toStringAsFixed(2)}',
+                            'S/ ${total.toStringAsFixed(2)}',
                             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.primary),
                           ),
                         ],
@@ -171,33 +164,42 @@ class _PosScreenState extends State<PosScreen> {
                     const SizedBox(height: 16),
 
                     // Payment Method selector
-                    const Text('Método de Pago', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    const Text('Método de Pago', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 8),
-                    Row(
-                      children: ['Efectivo', 'Tarjeta', 'Yape', 'Plin'].map((method) {
-                        final isSel = _selectedPaymentMethod == method;
-                        return Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 3),
-                            child: InkWell(
-                              onTap: () => setModalState(() => _selectedPaymentMethod = method),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: isSel ? AppColors.primary : (isDark ? AppColors.darkInputBg : AppColors.inputBg),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: isSel ? AppColors.primary : (isDark ? AppColors.darkBorder : AppColors.border)),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: paymentMethods.map((pm) {
+                        final isSel = _selectedPaymentMethod == pm['name'];
+                        return InkWell(
+                          onTap: () => setModalState(() => _selectedPaymentMethod = pm['name'] as String),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isSel
+                                  ? AppColors.primary
+                                  : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  pm['icon'] as IconData,
+                                  size: 16,
+                                  color: isSel ? Colors.white : (isDark ? AppColors.darkTextPrimary : const Color(0xFF334155)),
                                 ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  method,
+                                const SizedBox(width: 6),
+                                Text(
+                                  pm['name'] as String,
                                   style: TextStyle(
                                     fontSize: 12.5,
                                     fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
-                                    color: isSel ? Colors.white : (isDark ? AppColors.darkTextPrimary : AppColors.textPrimary),
+                                    color: isSel ? Colors.white : (isDark ? AppColors.darkTextPrimary : const Color(0xFF334155)),
                                   ),
                                 ),
-                              ),
+                              ],
                             ),
                           ),
                         );
@@ -205,7 +207,7 @@ class _PosScreenState extends State<PosScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    // Amount paid & change
+                    // Cash calculation
                     if (_selectedPaymentMethod == 'Efectivo') ...[
                       Row(
                         children: [
@@ -232,11 +234,11 @@ class _PosScreenState extends State<PosScreen> {
                                 const Text('Vuelto / Cambio', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                                 const SizedBox(height: 4),
                                 Container(
-                                  height: 48,
+                                  height: 46,
                                   alignment: Alignment.centerLeft,
                                   padding: const EdgeInsets.symmetric(horizontal: 14),
                                   decoration: BoxDecoration(
-                                    color: isDark ? AppColors.darkInputBg : AppColors.inputBg,
+                                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
                                   ),
@@ -253,7 +255,7 @@ class _PosScreenState extends State<PosScreen> {
                       const SizedBox(height: 14),
                     ],
 
-                    // Customer Name & Receipt Type
+                    // Customer & Receipt
                     Row(
                       children: [
                         Expanded(
@@ -264,7 +266,7 @@ class _PosScreenState extends State<PosScreen> {
                               const SizedBox(height: 4),
                               TextField(
                                 controller: _customerNameController,
-                                decoration: const InputDecoration(hintText: 'Nombre o RUC/DNI'),
+                                decoration: const InputDecoration(hintText: 'Nombre o DNI/RUC'),
                               ),
                             ],
                           ),
@@ -277,7 +279,7 @@ class _PosScreenState extends State<PosScreen> {
                               const Text('Comprobante', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                               const SizedBox(height: 4),
                               DropdownButtonFormField<String>(
-                                value: _receiptType,
+                                initialValue: _receiptType,
                                 decoration: const InputDecoration(),
                                 items: ['Ticket', 'Boleta', 'Factura'].map((t) {
                                   return DropdownMenuItem(value: t, child: Text(t));
@@ -291,7 +293,7 @@ class _PosScreenState extends State<PosScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
 
                     ElevatedButton(
                       onPressed: () async {
@@ -301,12 +303,14 @@ class _PosScreenState extends State<PosScreen> {
                           customerName: _customerNameController.text.trim(),
                           receiptType: _receiptType,
                         );
-                        Navigator.of(context).pop();
+                        if (!context.mounted) return;
+                        Navigator.pop(ctx);
                         _showTicketDialog(sale);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                       child: const Text('Completar y Emitir Ticket', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                     ),
@@ -326,19 +330,19 @@ class _PosScreenState extends State<PosScreen> {
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         return AlertDialog(
-          backgroundColor: isDark ? AppColors.darkCard : AppColors.card,
+          backgroundColor: isDark ? AppColors.darkCard : Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           content: Container(
-            width: 340,
+            width: 320,
             padding: const EdgeInsets.all(8),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 50),
-                const SizedBox(height: 12),
-                const Text('¡Venta Exitosa!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                Text(sale.ticketNumber, style: const TextStyle(fontSize: 14, color: AppColors.primary, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 16),
+                const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 48),
+                const SizedBox(height: 10),
+                const Text('¡Venta Exitosa!', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                Text(sale.ticketNumber, style: const TextStyle(fontSize: 13, color: AppColors.primary, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 14),
                 Divider(color: isDark ? AppColors.darkBorder : AppColors.border),
                 ...sale.items.map((it) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 3),
@@ -354,7 +358,7 @@ class _PosScreenState extends State<PosScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('TOTAL:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                    const Text('TOTAL:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                     Text('S/ ${sale.total.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.primary)),
                   ],
                 ),
@@ -375,118 +379,10 @@ class _PosScreenState extends State<PosScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isOpen = widget.state.currentShift?.isOpen ?? false;
-
-    // Screenshot 5: Abrir Jornada Card if shift is closed
-    if (!isOpen) {
-      return Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Container(
-            width: 440,
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkCard : AppColors.card,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Register Icon in blue circular box
-                Center(
-                  child: Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.point_of_sale_rounded,
-                      color: AppColors.primary,
-                      size: 28,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Title: Abrir Jornada
-                Center(
-                  child: Text(
-                    'Abrir Jornada',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Center(
-                  child: Text(
-                    'Abre la jornada para comenzar las operaciones del día.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, color: AppColors.textMuted),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Monto inicial en caja (opcional)
-                const Text(
-                  'Monto inicial en caja (opcional)',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: _initialAmountController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(hintText: '0.00'),
-                ),
-                const SizedBox(height: 16),
-
-                // Notas de apertura (opcional)
-                const Text(
-                  'Notas de apertura (opcional)',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: _openingNotesController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(hintText: 'Ej: Apertura normal'),
-                ),
-                const SizedBox(height: 24),
-
-                // Blue Action Button
-                ElevatedButton.icon(
-                  onPressed: _openShift,
-                  icon: const Icon(Icons.point_of_sale_rounded, size: 18),
-                  label: const Text('Abrir Jornada'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    // When shift IS open: Full POS Terminal
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 900;
 
+    // Filter products
     final filteredProducts = widget.state.products.where((p) {
       final matchesSearch = p.name.toLowerCase().contains(_posSearchQuery.toLowerCase()) ||
           p.barcode.contains(_posSearchQuery);
@@ -494,373 +390,575 @@ class _PosScreenState extends State<PosScreen> {
       return matchesSearch && matchesCategory;
     }).toList();
 
-    return isDesktop
-        ? Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Left: Catalog & Search
-              Expanded(
-                flex: 3,
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
+    // Pagination
+    final totalPages = (filteredProducts.length / _itemsPerPage).ceil().clamp(1, 999);
+    final startIndex = (_currentPage - 1) * _itemsPerPage;
+    final endIndex = (startIndex + _itemsPerPage).clamp(0, filteredProducts.length);
+    final displayedProducts = (startIndex < filteredProducts.length)
+        ? filteredProducts.sublist(startIndex, endIndex)
+        : <Product>[];
+
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: isDesktop
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Left 65%: Catalog, Search Bar, Categories (Image 5)
+                Expanded(
+                  flex: 65,
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Search and Close Shift bar
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              onChanged: (val) => setState(() => _posSearchQuery = val),
-                              decoration: const InputDecoration(
-                                hintText: 'Buscar producto por nombre o código de barras...',
-                                prefixIcon: Icon(Icons.search_rounded, size: 20),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          OutlinedButton.icon(
-                            onPressed: _showCloseShiftDialog,
-                            icon: const Icon(Icons.lock_clock_outlined, size: 16, color: AppColors.danger),
-                            label: const Text('Cerrar Jornada', style: TextStyle(color: AppColors.danger)),
-                            style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.danger)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
+                      // Top Row: Search + Producto libre + Pagination (Image 5)
+                      _buildTopBar(isDark, totalPages),
+                      const SizedBox(height: 14),
 
-                      // Category Chips Filter
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: ['Todos', ...widget.state.categories.map((c) => c.name)].map((cat) {
-                            final isSel = _selectedCategory == cat;
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: ChoiceChip(
-                                label: Text(cat),
-                                selected: isSel,
-                                onSelected: (_) => setState(() => _selectedCategory = cat),
-                                selectedColor: AppColors.primary,
-                                labelStyle: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: isSel ? FontWeight.w600 : FontWeight.w500,
-                                  color: isSel ? Colors.white : (isDark ? AppColors.darkTextPrimary : AppColors.textPrimary),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+                      // Category Pills (Image 5)
+                      _buildCategoryRow(isDark),
+                      const SizedBox(height: 20),
 
-                      // Products Grid
+                      // Products Grid or Empty State (Image 5)
                       Expanded(
-                        child: filteredProducts.isEmpty
-                            ? const Center(
-                                child: Text('No hay productos disponibles', style: TextStyle(color: AppColors.textMuted)),
-                              )
-                            : GridView.builder(
-                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 3,
-                                  childAspectRatio: 1.25,
-                                  crossAxisSpacing: 12,
-                                  mainAxisSpacing: 12,
-                                ),
-                                itemCount: filteredProducts.length,
-                                itemBuilder: (context, idx) {
-                                  final prod = filteredProducts[idx];
-                                  return InkWell(
-                                    onTap: () => widget.state.addToCart(prod),
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: isDark ? AppColors.darkCard : AppColors.card,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: isDark ? const Color(0xFF334155) : const Color(0xFFEFF6FF),
-                                                  borderRadius: BorderRadius.circular(4),
-                                                ),
-                                                child: Text(
-                                                  prod.category,
-                                                  style: const TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.w600),
-                                                ),
-                                              ),
-                                              Text(
-                                                'Stock: ${prod.stock.toInt()}',
-                                                style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
-                                              ),
-                                            ],
-                                          ),
-                                          Text(
-                                            prod.name,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontSize: 13.5,
-                                              fontWeight: FontWeight.w700,
-                                              color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
-                                            ),
-                                          ),
-                                          Text(
-                                            'S/ ${prod.price.toStringAsFixed(2)}',
-                                            style: const TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w800,
-                                              color: AppColors.primary,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
+                        child: displayedProducts.isEmpty
+                            ? _buildEmptyState(isDark)
+                            : _buildProductsGrid(displayedProducts, isDark),
                       ),
                     ],
                   ),
                 ),
-              ),
+                const SizedBox(width: 20),
 
-              // Right: Cart Ticket
-              Container(
-                width: 360,
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkCard : AppColors.card,
-                  border: Border(
-                    left: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.border),
-                  ),
+                // Right 35%: Cart Ticket Panel (Image 5)
+                Expanded(
+                  flex: 35,
+                  child: _buildCartCard(isDark),
                 ),
-                child: _buildCartPanel(isDark),
-              ),
-            ],
-          )
-        : Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        onChanged: (val) => setState(() => _posSearchQuery = val),
-                        decoration: const InputDecoration(
-                          hintText: 'Buscar...',
-                          prefixIcon: Icon(Icons.search_rounded),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.lock_clock_outlined, color: AppColors.danger),
-                      onPressed: _showCloseShiftDialog,
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: filteredProducts.isEmpty
-                    ? const Center(child: Text('No hay productos'))
-                    : ListView.builder(
-                        itemCount: filteredProducts.length,
-                        itemBuilder: (context, idx) {
-                          final prod = filteredProducts[idx];
-                          return ListTile(
-                            title: Text(prod.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: Text('S/ ${prod.price.toStringAsFixed(2)} · Stock: ${prod.stock.toInt()}'),
-                            trailing: ElevatedButton(
-                              onPressed: () => widget.state.addToCart(prod),
-                              child: const Icon(Icons.add_rounded, size: 16),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-              Container(
-                height: 180,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkCard : AppColors.card,
-                  border: Border(top: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.border)),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Ítems: ${widget.state.cartItemsCount}'),
-                        Text('Total: S/ ${widget.state.cartTotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.primary)),
-                      ],
-                    ),
-                    const Spacer(),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: widget.state.cart.isNotEmpty ? _showCheckoutDialog : null,
-                        child: Text('Cobrar S/ ${widget.state.cartTotal.toStringAsFixed(2)}'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-  }
-
-  Widget _buildCartPanel(bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Cart Header
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
+              ],
+            )
+          : SingleChildScrollView(
+              child: Column(
                 children: [
-                  const Icon(Icons.shopping_cart_outlined, size: 20, color: AppColors.primary),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Ticket Actual',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
-                    ),
+                  _buildTopBar(isDark, totalPages),
+                  const SizedBox(height: 12),
+                  _buildCategoryRow(isDark),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 380,
+                    child: displayedProducts.isEmpty
+                        ? _buildEmptyState(isDark)
+                        : _buildProductsGrid(displayedProducts, isDark),
                   ),
+                  const SizedBox(height: 16),
+                  _buildCartCard(isDark),
                 ],
               ),
-              if (widget.state.cart.isNotEmpty)
-                TextButton(
-                  onPressed: widget.state.clearCart,
-                  child: const Text('Limpiar', style: TextStyle(fontSize: 12, color: AppColors.danger)),
+            ),
+    );
+  }
+
+  // Top Bar matching Image 5: Search Input + [ Producto libre ] + [ < ] [ > ]
+  Widget _buildTopBar(bool isDark, int totalPages) {
+    return Row(
+      children: [
+        // Search Input: "Escanea código de barras o busca productos..."
+        Expanded(
+          child: Container(
+            height: 42,
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkCard : Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: Row(
+              children: [
+                const SizedBox(width: 12),
+                Icon(
+                  Icons.search_rounded,
+                  size: 19,
+                  color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
                 ),
-            ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (val) {
+                      setState(() {
+                        _posSearchQuery = val;
+                        _currentPage = 1;
+                      });
+                    },
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      color: isDark ? AppColors.darkTextPrimary : const Color(0xFF0F172A),
+                    ),
+                    decoration: const InputDecoration(
+                      hintText: 'Escanea código de barras o busca productos...',
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
+                if (_posSearchQuery.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 16),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() {
+                        _posSearchQuery = '';
+                        _currentPage = 1;
+                      });
+                    },
+                  ),
+              ],
+            ),
           ),
         ),
-        Divider(height: 1, color: isDark ? AppColors.darkBorder : AppColors.border),
+        const SizedBox(width: 10),
 
-        // Cart Items
-        Expanded(
-          child: widget.state.cart.isEmpty
-              ? const Center(
-                  child: Text('El ticket está vacío', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: widget.state.cart.length,
-                  separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? AppColors.darkBorder : AppColors.border),
-                  itemBuilder: (context, idx) {
-                    final item = widget.state.cart[idx];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.product.name,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+        // "Producto libre" button (Image 5 & Image 1 Drawer)
+        OutlinedButton.icon(
+          onPressed: _showCustomProductDrawer,
+          icon: const Icon(Icons.all_inbox_outlined, size: 16),
+          label: const Text('Producto libre', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: isDark ? AppColors.darkTextPrimary : const Color(0xFF1E293B),
+            side: BorderSide(
+              color: isDark ? AppColors.darkBorder : const Color(0xFFCBD5E1),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+        const SizedBox(width: 10),
+
+        // Pagination buttons < > (Image 5)
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            InkWell(
+              onTap: _currentPage > 1
+                  ? () => setState(() => _currentPage--)
+                  : null,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isDark ? AppColors.darkBorder : const Color(0xFFCBD5E1),
+                  ),
+                ),
+                child: Icon(
+                  Icons.chevron_left_rounded,
+                  size: 20,
+                  color: _currentPage > 1
+                      ? (isDark ? AppColors.darkTextPrimary : const Color(0xFF1E293B))
+                      : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            InkWell(
+              onTap: _currentPage < totalPages
+                  ? () => setState(() => _currentPage++)
+                  : null,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isDark ? AppColors.darkBorder : const Color(0xFFCBD5E1),
+                  ),
+                ),
+                child: Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: _currentPage < totalPages
+                      ? (isDark ? AppColors.darkTextPrimary : const Color(0xFF1E293B))
+                      : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // Category Pills matching Image 5
+  Widget _buildCategoryRow(bool isDark) {
+    final categories = ['Todos', ...widget.state.categories.map((c) => c.name)];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: categories.map((cat) {
+          final isSel = _selectedCategory == cat;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: InkWell(
+              onTap: () => setState(() {
+                _selectedCategory = cat;
+                _currentPage = 1;
+              }),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(
+                  color: isSel
+                      ? AppColors.primary
+                      : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isSel
+                        ? AppColors.primary
+                        : (isDark ? AppColors.darkBorder : Colors.transparent),
+                  ),
+                ),
+                child: Text(
+                  cat,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                    color: isSel
+                        ? Colors.white
+                        : (isDark ? AppColors.darkTextSecondary : const Color(0xFF475569)),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // Empty State matching Image 5: "No se encontraron productos"
+  Widget _buildEmptyState(bool isDark) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.all_inbox_outlined,
+            size: 56,
+            color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'No se encontraron productos',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Products Grid
+  Widget _buildProductsGrid(List<Product> products, bool isDark) {
+    return GridView.builder(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 1.35,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      ),
+      itemCount: products.length,
+      itemBuilder: (context, idx) {
+        final prod = products[idx];
+        return InkWell(
+          onTap: () => widget.state.addToCart(prod),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkCard : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        prod.category.isNotEmpty ? prod.category : 'General',
+                        style: const TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    Text(
+                      'Stock: ${prod.stock.toInt()}',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                    ),
+                  ],
+                ),
+                Text(
+                  prod.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? AppColors.darkTextPrimary : const Color(0xFF0F172A),
+                  ),
+                ),
+                Text(
+                  'S/ ${prod.price.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Right Cart Panel matching Image 5
+  Widget _buildCartCard(bool isDark) {
+    final cart = widget.state.cart;
+    final total = widget.state.cartTotal;
+    final subtotal = widget.state.cartSubtotal;
+    final itemsCount = widget.state.cartItemsCount;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header: [ 🛒 ] Carrito (X)
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.shopping_cart_outlined,
+                      size: 18,
+                      color: isDark ? AppColors.darkTextPrimary : const Color(0xFF0F172A),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Carrito ($itemsCount)',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? AppColors.darkTextPrimary : const Color(0xFF0F172A),
+                      ),
+                    ),
+                  ],
+                ),
+                if (cart.isNotEmpty)
+                  InkWell(
+                    onTap: widget.state.clearCart,
+                    child: const Text(
+                      'Vaciar',
+                      style: TextStyle(fontSize: 12, color: AppColors.danger, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9)),
+
+          // Cart Center Body: Empty State (Image 5) or Item List
+          Expanded(
+            child: cart.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.shopping_cart_outlined,
+                          size: 46,
+                          color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Carrito vacío',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? AppColors.darkTextPrimary : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Agrega productos para comenzar',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.all(14),
+                    itemCount: cart.length,
+                    separatorBuilder: (context, index) => Divider(height: 1, color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9)),
+                    itemBuilder: (context, idx) {
+                      final item = cart[idx];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.product.name,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark ? AppColors.darkTextPrimary : const Color(0xFF0F172A),
+                                    ),
                                   ),
+                                  Text(
+                                    'S/ ${item.customPrice.toStringAsFixed(2)} c/u',
+                                    style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.remove_circle_outline_rounded, size: 18),
+                                  onPressed: () => widget.state.updateCartQuantity(item.product.id, -1),
                                 ),
-                                Text(
-                                  'S/ ${item.customPrice.toStringAsFixed(2)} c/u',
-                                  style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+                                Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                                IconButton(
+                                  icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
+                                  onPressed: () => widget.state.updateCartQuantity(item.product.id, 1),
                                 ),
                               ],
                             ),
-                          ),
-                          Row(
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.remove_circle_outline_rounded, size: 18),
-                                onPressed: () => widget.state.updateCartQuantity(item.product.id, -1),
+                            SizedBox(
+                              width: 65,
+                              child: Text(
+                                'S/ ${item.total.toStringAsFixed(2)}',
+                                textAlign: TextAlign.right,
+                                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
                               ),
-                              Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                              IconButton(
-                                icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
-                                onPressed: () => widget.state.updateCartQuantity(item.product.id, 1),
-                              ),
-                            ],
-                          ),
-                          SizedBox(
-                            width: 65,
-                            child: Text(
-                              'S/ ${item.total.toStringAsFixed(2)}',
-                              textAlign: TextAlign.right,
-                              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
                             ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-        ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          Divider(height: 1, color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9)),
 
-        // Cart Footer Total & Checkout
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-            border: Border(top: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.border)),
-          ),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Subtotal', style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
-                  Text('S/ ${widget.state.cartSubtotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('TOTAL', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                  Text(
-                    'S/ ${widget.state.cartTotal.toStringAsFixed(2)}',
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.primary),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: widget.state.cart.isNotEmpty ? _showCheckoutDialog : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  child: Text(
-                    'Cobrar (S/ ${widget.state.cartTotal.toStringAsFixed(2)})',
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          // Cart Summary Footer (Image 5): Subtotal + Total + [ 💳 Procesar Venta ]
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Subtotal:',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                      ),
+                    ),
+                    Text(
+                      'S/ ${subtotal.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.darkTextPrimary : const Color(0xFF0F172A),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total:',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? AppColors.darkTextPrimary : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    Text(
+                      'S/ ${total.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? AppColors.darkTextPrimary : const Color(0xFF0F172A),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Blue Button: [ 💳 Procesar Venta ] (Image 5)
+                SizedBox(
+                  height: 46,
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: cart.isNotEmpty ? _handleProcessSale : null,
+                    icon: const Icon(Icons.payment_rounded, size: 18),
+                    label: const Text(
+                      'Procesar Venta',
+                      style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

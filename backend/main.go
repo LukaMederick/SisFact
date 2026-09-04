@@ -40,6 +40,9 @@ func main() {
 
 	// API Routes
 	mux.HandleFunc("/api/health", h.HealthCheck)
+	mux.HandleFunc("/api/auth/login", h.HandleLogin)
+	mux.HandleFunc("/api/auth/register", h.HandleRegister)
+	mux.HandleFunc("/api/auth/google", h.HandleGoogleAuth)
 	mux.HandleFunc("/api/dashboard", h.GetDashboard)
 	mux.HandleFunc("/api/products", h.HandleProducts)
 	mux.HandleFunc("/api/categories", h.HandleCategories)

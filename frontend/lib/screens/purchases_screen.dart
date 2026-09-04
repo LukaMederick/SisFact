@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../state/app_state.dart';
+import '../widgets/date_range_picker_dialog.dart';
+import '../widgets/kpi_card.dart';
 
 class PurchasesScreen extends StatefulWidget {
   final AppState state;
@@ -14,6 +16,7 @@ class PurchasesScreen extends StatefulWidget {
 class _PurchasesScreenState extends State<PurchasesScreen> {
   String _activeTab = 'Nueva Compra';
   final _searchController = TextEditingController();
+  String _historySearchQuery = '';
 
   @override
   void dispose() {
@@ -26,11 +29,12 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 900;
+    final isMobile = screenWidth < 700;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Sub-navbar: Compras / Nueva Compra / Historial (Screenshot 5)
+        // Sub-navbar: Compras / Nueva Compra / Historial
         Container(
           height: 48,
           decoration: BoxDecoration(
@@ -73,67 +77,9 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Header (Screenshot 5)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Nueva Compra',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    const Text(
-                      'Registra una nueva compra de productos para tu inventario',
-                      style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Responsive Layout: Left Search & Empty Cart + Right Purchase Summary
-                isDesktop
-                    ? Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Left Section (Search + Empty Cart)
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _buildSearchAndAiBar(isDark),
-                                const SizedBox(height: 16),
-                                _buildEmptyCartCard(isDark),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 24),
-
-                          // Right Section (Resumen de Compra)
-                          SizedBox(
-                            width: 320,
-                            child: _buildPurchaseSummaryCard(isDark),
-                          ),
-                        ],
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _buildSearchAndAiBar(isDark),
-                          const SizedBox(height: 16),
-                          _buildEmptyCartCard(isDark),
-                          const SizedBox(height: 20),
-                          _buildPurchaseSummaryCard(isDark),
-                        ],
-                      ),
-              ],
-            ),
+            child: _activeTab == 'Historial'
+                ? _buildHistoryView(isDark, isDesktop, isMobile)
+                : _buildNewPurchaseView(isDark, isDesktop),
           ),
         ),
       ],
@@ -146,118 +92,323 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
     return InkWell(
       onTap: () => setState(() => _activeTab = title),
       child: Container(
-        height: 48,
+        padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
               color: isSelected ? AppColors.primary : Colors.transparent,
-              width: 2.5,
+              width: 2,
             ),
           ),
         ),
-        alignment: Alignment.center,
         child: Text(
           title,
           style: TextStyle(
             fontSize: 13,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            color: isSelected ? AppColors.primary : AppColors.textSecondary,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected
+                ? AppColors.primary
+                : (isDark ? AppColors.darkTextSecondary : AppColors.textSecondary),
           ),
         ),
       ),
     );
   }
 
-  // Search input + Escanear IA Premium button
-  Widget _buildSearchAndAiBar(bool isDark) {
+  // --- HISTORIAL VIEW ---
+  Widget _buildHistoryView(bool isDark, bool isDesktop, bool isMobile) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Buscar Producto',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 6),
+        // Header: Historial de Compras + Date Button
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Expanded(
-              child: TextField(
-                controller: _searchController,
-                decoration: const InputDecoration(
-                  hintText: 'Buscar por nombre o o escanea código de barras...',
-                  prefixIcon: Icon(Icons.search_rounded, size: 18),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Stack(
-              clipBehavior: Clip.none,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
-                    borderRadius: BorderRadius.circular(10),
-                    color: isDark ? AppColors.darkCard : AppColors.card,
-                  ),
-                  child: InkWell(
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Escanear IA: Función Inteligente de Facturas')),
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(10),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      child: Row(
-                        children: [
-                          Icon(Icons.fullscreen_rounded, size: 18, color: AppColors.textPrimary),
-                          SizedBox(width: 8),
-                          Text(
-                            'Escanear IA',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
-                    ),
+                Text(
+                  'Historial de Compras',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
                   ),
                 ),
-                // Orange Premium Badge Chip (Screenshot 5)
-                Positioned(
-                  top: -8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEA580C),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.workspace_premium_rounded, size: 11, color: Colors.white),
-                        SizedBox(width: 2),
-                        Text(
-                          'Premium',
-                          style: TextStyle(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Consulta todas las compras registradas a tus proveedores',
+                  style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
                 ),
               ],
             ),
+            // Date Picker Button
+            InkWell(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => DateRangePickerPopup(state: widget.state),
+                );
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.3) : const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isDark ? AppColors.darkBorder : AppColors.primary.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today_outlined, size: 16, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      widget.state.formattedSelectedDate,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
+        ),
+        const SizedBox(height: 20),
+
+        // 4 KPI Cards: Total Compras (0), Monto Total (S/ 0.00), Productos (0), Promedio (S/ 0.00)
+        isMobile
+            ? Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: _buildKpiCard('Total Compras', '0', Icons.shopping_bag_outlined, AppColors.primary)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _buildKpiCard('Monto Total', 'S/ 0.00', Icons.attach_money_rounded, AppColors.success)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: _buildKpiCard('Productos', '0', Icons.all_inbox_outlined, AppColors.purple)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _buildKpiCard('Promedio', 'S/ 0.00', Icons.calculate_outlined, AppColors.warning)),
+                    ],
+                  ),
+                ],
+              )
+            : Row(
+                children: [
+                  Expanded(child: _buildKpiCard('Total Compras', '0', Icons.shopping_bag_outlined, AppColors.primary)),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildKpiCard('Monto Total', 'S/ 0.00', Icons.attach_money_rounded, AppColors.success)),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildKpiCard('Productos', '0', Icons.all_inbox_outlined, AppColors.purple)),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildKpiCard('Promedio', 'S/ 0.00', Icons.calculate_outlined, AppColors.warning)),
+                ],
+              ),
+        const SizedBox(height: 24),
+
+        // Main Container: Search & Empty State
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkCard : AppColors.card,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Search Input
+              Container(
+                height: 42,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(width: 12),
+                    const Icon(Icons.search_rounded, size: 18, color: AppColors.textSecondary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        onChanged: (val) => setState(() => _historySearchQuery = val),
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          color: isDark ? AppColors.darkTextPrimary : const Color(0xFF0F172A),
+                        ),
+                        decoration: const InputDecoration(
+                          hintText: 'Buscar compra por proveedor, factura o producto...',
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 48),
+
+              // Empty State
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.receipt_long_outlined,
+                        size: 30,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No hay compras registradas',
+                      style: TextStyle(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _historySearchQuery.isEmpty
+                          ? 'Las compras que registres aparecerán aquí'
+                          : 'No se encontraron resultados para "$_historySearchQuery"',
+                      style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 48),
+            ],
+          ),
         ),
       ],
     );
   }
 
-  // Large Box with Empty Cart (Screenshot 5)
+  // --- NUEVA COMPRA VIEW ---
+  Widget _buildNewPurchaseView(bool isDark, bool isDesktop) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Header
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Nueva Compra',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 2),
+            const Text(
+              'Registra una nueva compra de productos para tu inventario',
+              style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        isDesktop
+            ? Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildSearchAndAiBar(isDark),
+                        const SizedBox(height: 16),
+                        _buildEmptyCartCard(isDark),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  SizedBox(
+                    width: 380,
+                    child: _buildPurchaseSummaryCard(isDark),
+                  ),
+                ],
+              )
+            : Column(
+                children: [
+                  _buildSearchAndAiBar(isDark),
+                  const SizedBox(height: 16),
+                  _buildEmptyCartCard(isDark),
+                  const SizedBox(height: 20),
+                  _buildPurchaseSummaryCard(isDark),
+                ],
+              ),
+      ],
+    );
+  }
+
+  Widget _buildSearchAndAiBar(bool isDark) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : AppColors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  decoration: const InputDecoration(
+                    hintText: 'Buscar producto por nombre o código...',
+                    prefixIcon: Icon(Icons.search_rounded, size: 20),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Lector de boleta/factura con IA listo')),
+                  );
+                },
+                icon: const Icon(Icons.auto_awesome_rounded, size: 16, color: AppColors.primary),
+                label: const Text('Cargar con IA', style: TextStyle(color: AppColors.primary)),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.border),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildEmptyCartCard(bool isDark) {
     return Container(
       height: 280,
@@ -287,7 +438,6 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
     );
   }
 
-  // Right Resumen de Compra Card (Screenshot 5)
   Widget _buildPurchaseSummaryCard(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -308,8 +458,6 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
             ),
           ),
           const SizedBox(height: 16),
-
-          // Productos: 0
           const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -318,8 +466,6 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
             ],
           ),
           const SizedBox(height: 10),
-
-          // Unidades: 0
           const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -328,11 +474,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
             ],
           ),
           const SizedBox(height: 14),
-
           Divider(height: 1, color: isDark ? AppColors.darkBorder : AppColors.border),
           const SizedBox(height: 14),
-
-          // Total: S/ 0.00
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -355,21 +498,18 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
             ],
           ),
           const SizedBox(height: 20),
-
-          // Disabled / Soft Blue Button (Screenshot 5)
           ElevatedButton.icon(
-            onPressed: null, // Disabled when empty
+            onPressed: null,
             icon: const Icon(Icons.save_outlined, size: 16),
             label: const Text('Guardar Compra'),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF93C5FD),
-              disabledBackgroundColor: isDark ? const Color(0xFF1E3A8A).withOpacity(0.4) : const Color(0xFF93C5FD),
+              disabledBackgroundColor: isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.4) : const Color(0xFF93C5FD),
               disabledForegroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
           ),
           const SizedBox(height: 10),
-
           const Text(
             'Agrega al menos un producto para guardar la compra',
             textAlign: TextAlign.center,
@@ -377,6 +517,14 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildKpiCard(String title, String value, IconData icon, Color color) {
+    return KpiCard(
+      title: title,
+      value: value,
+      icon: Icon(icon, size: 20, color: color),
     );
   }
 }

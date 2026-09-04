@@ -78,13 +78,13 @@ class _SunatDocumentsScreenState extends State<SunatDocumentsScreen> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.textSecondary),
-                      SizedBox(width: 8),
+                      const Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.textSecondary),
+                      const SizedBox(width: 8),
                       Text(
-                        '01/08/2026 - 30/08/2026',
-                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                        widget.state.formattedSelectedDate,
+                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
@@ -157,37 +157,57 @@ class _SunatDocumentsScreenState extends State<SunatDocumentsScreen> {
                     const SizedBox(width: 12),
 
                     // Filter 1 Dropdown
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isDark ? AppColors.darkInputBg : AppColors.inputBg,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
-                      ),
-                      child: const Row(
-                        children: [
-                          Text('Todos', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                          SizedBox(width: 6),
-                          Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.textMuted),
-                        ],
+                    PopupMenuButton<String>(
+                      initialValue: _selectedDocType,
+                      onSelected: (val) => setState(() => _selectedDocType = val),
+                      itemBuilder: (ctx) => [
+                        const PopupMenuItem(value: 'Todos', child: Text('Todos los Tipos')),
+                        const PopupMenuItem(value: 'Boleta', child: Text('Boleta de Venta')),
+                        const PopupMenuItem(value: 'Factura', child: Text('Factura Electrónica')),
+                        const PopupMenuItem(value: 'Nota de Crédito', child: Text('Nota de Crédito')),
+                      ],
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.darkInputBg : AppColors.inputBg,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(_selectedDocType, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                            const SizedBox(width: 6),
+                            const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.textMuted),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
 
                     // Filter 2 Dropdown
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isDark ? AppColors.darkInputBg : AppColors.inputBg,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
-                      ),
-                      child: const Row(
-                        children: [
-                          Text('Todos', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                          SizedBox(width: 6),
-                          Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.textMuted),
-                        ],
+                    PopupMenuButton<String>(
+                      initialValue: _selectedDocStatus,
+                      onSelected: (val) => setState(() => _selectedDocStatus = val),
+                      itemBuilder: (ctx) => [
+                        const PopupMenuItem(value: 'Todos', child: Text('Todos los Estados')),
+                        const PopupMenuItem(value: 'Aceptado', child: Text('Aceptado por SUNAT')),
+                        const PopupMenuItem(value: 'Pendiente', child: Text('Pendiente de Envío')),
+                        const PopupMenuItem(value: 'Rechazado', child: Text('Rechazado / Con error')),
+                      ],
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.darkInputBg : AppColors.inputBg,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(_selectedDocStatus, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                            const SizedBox(width: 6),
+                            const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.textMuted),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -237,9 +257,11 @@ class _SunatDocumentsScreenState extends State<SunatDocumentsScreen> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    const Text(
-                      'No se encontraron documentos electrónicos para el período seleccionado.',
-                      style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+                    Text(
+                      _searchQuery.isNotEmpty
+                          ? 'No se encontraron documentos que coincidan con "$_searchQuery".'
+                          : 'No se encontraron documentos electrónicos para el período seleccionado.',
+                      style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
                     ),
                   ],
                 ),
